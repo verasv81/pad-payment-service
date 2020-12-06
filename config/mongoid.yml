@@ -1,0 +1,6 @@
+development:
+  clients:
+    default:
+      uri: mongodb+srv://devuser:8pKakDQ7NuDOJg0v@cluster0.tllvz.mongodb.net/pad-payment?retryWrites=true&w=majority
+      options:
+        server_selection_timeout: 5
