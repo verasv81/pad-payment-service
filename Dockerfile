@@ -11,4 +11,4 @@ RUN bundle install
 
 EXPOSE 9000
 
-CMD ruby main.rb
+CMD ruby main.rb 
