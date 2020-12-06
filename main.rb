@@ -22,6 +22,26 @@ end
 set :bind, "0.0.0.0"
 set :port, 9000
 
+GATEWAY_ADRESS = "http://localhost:52506/"
+
+begin
+  at_exit do
+    RestClient.post GATEWAY_ADRESS + "services/deregister", { "name": "test", "address": "localhost:9000" }.to_json
+  end
+rescue
+  puts "Error when exit"
+ensure
+  puts " "
+end
+
+begin
+  RestClient.post GATEWAY_ADRESS + "register", { "name": "payment-service", "address": "localhost:9000" }.to_json
+rescue
+  puts "Connection to the gateway failed"
+ensure
+  puts " "
+end
+
 get "/healthcheck" do
   status 200
   body "OK"
