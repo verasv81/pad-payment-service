@@ -1,0 +1,58 @@
+version: '3.8'
+services: 
+    payment-service:
+        image: verasv997/pad-payment-service:1.1
+        container_name: pad-payment-service
+        ports: ['9000:9000']
+        environment:
+            - IP=payment-service
+            - PORT=9000
+        command: >
+          /bin/sh -c "
+            echo Waiting for rabbitmq service start...;
+            while ! nc -z rabbitmq-service 5672;
+            do
+              sleep 1;
+            done;
+            echo RabbitMQ ready.;
+            ruby main.rb"
+        networks: 
+          - internal
+
+    order-service:
+        image: inabotnaru/lab2pad:1
+        container_name: pad-order-service
+        ports: ['8000:8000']
+        environment:
+            - IP=order-service
+            - PORT=8000
+        command: >
+          /bin/sh -c "
+            echo Waiting for rabbitmq service start...;
+            while ! nc -z rabbitmq-service 5672;
+            do
+              sleep 1;
+            done;
+            echo RabbitMQ ready.;
+            ruby main.rb"
+        networks: 
+          - internal
+
+    rabbitmq-service:
+      image: rabbitmq:3-management
+      hostname: rabbitmq-service
+      container_name: rabbitmq-service
+      volumes:
+        - ./rabbitmq/etc/definitions.json:/etc/rabbitmq/definitions.json
+        - ./rabbitmq/etc/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+        - ./rabbitmq/data:/var/lib/rabbitmq/mnesia/rabbit@rabbitmq-service
+        - ./rabbitmq/logs:/var/log/rabbitmq/log
+      ports:
+        - 5672:5672
+        - 15672:15672
+      networks: 
+        - internal
+
+networks: 
+  internal: 
+    driver: bridge

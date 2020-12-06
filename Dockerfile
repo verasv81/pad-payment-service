@@ -7,7 +7,7 @@ RUN apk update && apk add --virtual build-dependencies build-base
 RUN apk add libxslt-dev libxml2-dev
 
 RUN gem install bundler
-RUN bundle install
+RUN bundle
 
 EXPOSE 9000
 
