@@ -1,0 +1,8 @@
+---
+server.name: kibana
+server.host: "0.0.0.0"
+
+elasticsearch.hosts: [ "http://${ELASTICSEARCH_HOST_PORT}" ]
+
+elasticsearch.username: ${ELASTIC_USERNAME}
+elasticsearch.password: ${ELASTIC_PASSWORD}

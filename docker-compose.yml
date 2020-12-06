@@ -1,58 +1,131 @@
 version: '3.8'
 services: 
-    payment-service:
-        image: verasv997/pad-payment-service:1.1
-        container_name: pad-payment-service
-        ports: ['9000:9000']
-        environment:
-            - IP=payment-service
-            - PORT=9000
-        command: >
-          /bin/sh -c "
-            echo Waiting for rabbitmq service start...;
-            while ! nc -z rabbitmq-service 5672;
-            do
-              sleep 1;
-            done;
-            echo RabbitMQ ready.;
-            ruby main.rb"
-        networks: 
-          - internal
-
-    order-service:
-        image: inabotnaru/lab2pad:1
-        container_name: pad-order-service
-        ports: ['8000:8000']
-        environment:
-            - IP=order-service
-            - PORT=8000
-        command: >
-          /bin/sh -c "
-            echo Waiting for rabbitmq service start...;
-            while ! nc -z rabbitmq-service 5672;
-            do
-              sleep 1;
-            done;
-            echo RabbitMQ ready.;
-            ruby main.rb"
-        networks: 
-          - internal
-
-    rabbitmq-service:
-      image: rabbitmq:3-management
-      hostname: rabbitmq-service
-      container_name: rabbitmq-service
-      volumes:
-        - ./rabbitmq/etc/definitions.json:/etc/rabbitmq/definitions.json
-        - ./rabbitmq/etc/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
-        - ./rabbitmq/data:/var/lib/rabbitmq/mnesia/rabbit@rabbitmq-service
-        - ./rabbitmq/logs:/var/log/rabbitmq/log
-      ports:
-        - 5672:5672
-        - 15672:15672
+  payment-service:
+      image: verasv997/pad-payment-service:1.1
+      container_name: pad-payment-service
+      ports: ['9000:9000']
+      environment:
+          - IP=payment-service
+          - PORT=9000
+      command: >
+        /bin/sh -c "
+          echo Waiting for rabbitmq service start...;
+          while ! nc -z rabbitmq-service 5672;
+          do
+            sleep 1;
+          done;
+          echo RabbitMQ ready.;
+          ruby main.rb"
       networks: 
         - internal
+
+  order-service:
+      image: inabotnaru/lab2pad:1
+      container_name: pad-order-service
+      ports: ['8000:8000']
+      environment:
+          - IP=order-service
+          - PORT=8000
+      command: >
+        /bin/sh -c "
+          echo Waiting for rabbitmq service start...;
+          while ! nc -z rabbitmq-service 5672;
+          do
+            sleep 1;
+          done;
+          echo RabbitMQ ready.;
+          ruby main.rb"
+      networks: 
+        - internal
+
+  rabbitmq-service:
+    image: rabbitmq:3-management
+    hostname: rabbitmq-service
+    container_name: rabbitmq-service
+    volumes:
+      - ./rabbitmq/etc/definitions.json:/etc/rabbitmq/definitions.json
+      - ./rabbitmq/etc/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./rabbitmq/data:/var/lib/rabbitmq/mnesia/rabbit@rabbitmq-service
+      - ./rabbitmq/logs:/var/log/rabbitmq/log
+    ports:
+      - 5672:5672
+      - 15672:15672
+    networks: 
+      - internal
+
+  elasticsearch:
+    build:
+      context: elk/elasticsearch/
+      args:
+        ELK_VERSION: ${ELK_VERSION}
+    restart: unless-stopped
+    environment:
+      ELASTIC_USERNAME: ${ELASTIC_USERNAME}
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      ELASTIC_CLUSTER_NAME: ${ELASTIC_CLUSTER_NAME}
+      ELASTIC_NODE_NAME: ${ELASTIC_NODE_NAME}
+      ELASTIC_INIT_MASTER_NODE: ${ELASTIC_INIT_MASTER_NODE}
+      ELASTIC_DISCOVERY_SEEDS: ${ELASTIC_DISCOVERY_SEEDS}
+      ES_JAVA_OPTS: -Xmx${ELASTICSEARCH_HEAP} -Xms${ELASTICSEARCH_HEAP}
+      bootstrap.memory_lock: "true"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+      - ./elk/elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+    secrets:
+      - source: elasticsearch.keystore
+        target: /usr/share/elasticsearch/config/elasticsearch.keystore
+      - source: elastic.certificates
+        target: /usr/share/elasticsearch/config/certs/elastic-certificates.p12
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 200000
+        hard: 200000
+
+  logstash:
+    build:
+      context: elk/logstash/
+      args:
+        ELK_VERSION: $ELK_VERSION
+    restart: unless-stopped
+    volumes:
+      - ./elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./elk/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    environment:
+      ELASTIC_USERNAME: ${ELASTIC_USERNAME}
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      ELASTICSEARCH_HOST_PORT: ${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}
+      LS_JAVA_OPTS: "-Xmx${LOGSTASH_HEAP} -Xms${LOGSTASH_HEAP}"
+
+  kibana:
+    build:
+      context: elk/kibana/
+      args:
+        ELK_VERSION: $ELK_VERSION
+    restart: unless-stopped
+    volumes:
+      - ./elk/kibana/config/:/usr/share/kibana/config:ro
+    environment:
+      ELASTIC_USERNAME: ${ELASTIC_USERNAME}
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      ELASTICSEARCH_HOST_PORT: ${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}
+    ports:
+      - "5601:5601"
 
 networks: 
   internal: 
     driver: bridge
+
+volumes:
+  elasticsearch-data:
+
+secrets:
+  elasticsearch.keystore:
+    file: ./secrets/elasticsearch.keystore
+  elastic.certificates:
+    file: ./secrets/elastic-certificates.p12
